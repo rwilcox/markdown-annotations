@@ -1,0 +1,6 @@
+version: 1
+name: net-task
+tasks:
+  start_app:
+    description: start the server
+    shell: npm run start
