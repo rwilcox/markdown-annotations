@@ -16,6 +16,8 @@ async function load() {
   const data = await res.json();
   docEl.innerHTML = data.docHtml;
   mountNotes(notesEl, data.notes);
+  const countEl = document.getElementById('notes-count');
+  if (countEl) countEl.textContent = `(${data.notes.length})`;
   analysisEl.innerHTML = data.analysisHtml || '';
   // Wait for fonts/images to settle before measuring.
   await document.fonts?.ready;
@@ -32,10 +34,11 @@ function mountNotes(container, notes) {
     if (!note.target || !docEl.querySelector(`[data-anchor="${note.target}"]`)) {
       el.classList.add('orphan');
     }
-    const snippetHtml = note.snippet
-      ? `<span class="snippet">“${escapeHtml(note.snippet)}”</span>`
+    const quote = `<div class="note-quote">${note.quoteHtml || ''}</div>`;
+    const commentary = note.commentaryHtml
+      ? `<div class="note-commentary">${note.commentaryHtml}</div>`
       : '';
-    el.innerHTML = snippetHtml + note.html;
+    el.innerHTML = quote + commentary;
     container.appendChild(el);
   }
 }

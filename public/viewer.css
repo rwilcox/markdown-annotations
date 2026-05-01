@@ -1,8 +1,5 @@
 :root {
-  --gap: 1.5rem;
-  --doc-width: 38rem;
-  --notes-width: 20rem;
-  --analysis-width: 20rem;
+  --gap: 1.25rem;
   --note-bg: #fff8d8;
   --note-border: #d9c97a;
   --analysis-bg: #e6f0ff;
@@ -38,12 +35,42 @@ body.viewer header {
 
 body.viewer main {
   display: grid;
-  grid-template-columns: var(--doc-width) var(--notes-width) var(--analysis-width);
-  gap: var(--gap);
-  padding: 2rem;
+  grid-template-columns:
+    minmax(26rem, 40rem)
+    minmax(15rem, 22rem)
+    minmax(15rem, 22rem);
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "h-doc h-notes h-analysis"
+    "doc   notes   analysis";
+  column-gap: var(--gap);
+  row-gap: 0.5rem;
+  padding: 1.5rem;
   align-items: start;
   position: relative;
 }
+
+.col-header {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 0.35rem;
+}
+.col-header .count {
+  font-weight: 400;
+  color: #999;
+  margin-left: 0.25rem;
+}
+.h-doc      { grid-area: h-doc; }
+.h-notes    { grid-area: h-notes; }
+.h-analysis { grid-area: h-analysis; }
+#doc        { grid-area: doc; }
+#notes      { grid-area: notes; }
+#analysis   { grid-area: analysis; }
 
 #doc {
   background: #fff;
@@ -86,6 +113,16 @@ body.viewer main {
   border-radius: 6px;
   padding: 1rem 1.2rem;
   font-size: 0.95rem;
+  position: sticky;
+  top: 4rem;                         /* clears sticky page <header> + col header */
+  max-height: calc(100vh - 5rem);
+  overflow-y: auto;
+}
+.h-analysis {
+  position: sticky;
+  top: 2.6rem;                       /* clears sticky page <header> */
+  background: #fafafa;               /* same as body so header text isn't see-through */
+  z-index: 4;
 }
 #analysis :first-child { margin-top: 0; }
 #analysis :last-child { margin-bottom: 0; }
@@ -93,13 +130,27 @@ body.viewer main {
   box-shadow: 0 4px 14px rgba(0,0,0,0.12);
   z-index: 2;
 }
-.note .snippet {
-  display: block;
-  font-size: 0.78rem;
+.note-quote {
+  font-size: 0.82rem;
   color: var(--muted);
-  margin-bottom: 0.35rem;
   font-style: italic;
+  border-left: 2px solid var(--note-border);
+  padding-left: 0.5rem;
+  margin-bottom: 0.5rem;
 }
+.note-quote blockquote {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.note-quote p { margin: 0.15rem 0; }
+
+.note-commentary {
+  font-size: 0.95rem;
+  color: #222;
+}
+.note-commentary p:first-child { margin-top: 0; }
+.note-commentary p:last-child { margin-bottom: 0; }
 .note.orphan {
   border-color: #c66;
   background: #ffecec;
@@ -107,10 +158,18 @@ body.viewer main {
 .note p:first-child { margin-top: 0; }
 .note p:last-child { margin-bottom: 0; }
 
-@media (max-width: 90rem) {
+@media (max-width: 62rem) {
   body.viewer main {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      "h-doc"
+      "doc"
+      "h-notes"
+      "notes"
+      "h-analysis"
+      "analysis";
   }
   .annot-col { position: static; min-height: 0; }
   .note { position: static; margin: 0.5rem 0; }
+  #analysis, .h-analysis { position: static; max-height: none; }
 }

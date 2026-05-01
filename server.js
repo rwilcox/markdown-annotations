@@ -57,62 +57,57 @@ function renderDoc(source) {
 }
 
 /**
- * Parse the notes file. Each top-level blockquote is one annotation. The
- * blockquote's first non-empty line MUST be a quoted snippet of source text,
- * e.g.  > "the original text"  — that snippet is matched against the source
- * blocks (substring, normalized) to find a target anchor. The rest of the
- * blockquote becomes the annotation body.
+ * Parse the notes file. Each top-level blockquote starts a new note: the
+ * blockquote text IS the quoted snippet from the source. Any plain
+ * paragraphs that follow (until the next blockquote or heading) are the
+ * user's commentary on that quote, rendered together in the same card.
  */
 function renderNotes(source, blocks) {
   const tokens = md.parse(source, {});
   const notes = [];
-  for (let i = 0; i < tokens.length; i++) {
+  let i = 0;
+  while (i < tokens.length) {
     const t = tokens[i];
-    if (t.level !== 0 || t.type !== 'blockquote_open') continue;
-    // Find matching close.
+    if (t.level !== 0 || t.type !== 'blockquote_open') { i++; continue; }
+
+    // Find matching blockquote_close.
     let depth = 1;
-    let end = i;
+    let bqEnd = i;
     for (let j = i + 1; j < tokens.length; j++) {
       if (tokens[j].type === 'blockquote_open') depth++;
       else if (tokens[j].type === 'blockquote_close') {
         depth--;
-        if (depth === 0) { end = j; break; }
+        if (depth === 0) { bqEnd = j; break; }
       }
     }
-    const inner = tokens.slice(i + 1, end);
+    const quoteTokens = tokens.slice(i, bqEnd + 1);
 
-    // Extract first inline token's first line as the snippet.
-    let snippet = null;
-    for (let k = 0; k < inner.length; k++) {
-      const tk = inner[k];
-      if (tk.type === 'inline' && tk.content.trim()) {
-        const firstLine = tk.content.split('\n')[0].trim();
-        const m = firstLine.match(/^["“”'‘’](.+)["“”'‘’]$/);
-        if (m) {
-          snippet = m[1];
-          const rest = tk.content.split('\n').slice(1).join('\n').trim();
-          if (rest === '') {
-            // Drop the whole paragraph_open/inline/paragraph_close trio so
-            // we don't emit an empty <p></p> in the rendered annotation.
-            const dropFrom = inner[k - 1]?.type === 'paragraph_open' ? k - 1 : k;
-            const dropTo = inner[k + 1]?.type === 'paragraph_close' ? k + 1 : k;
-            inner.splice(dropFrom, dropTo - dropFrom + 1);
-          } else {
-            tk.content = rest;
-            if (tk.children) {
-              tk.children = md.parseInline(rest, {})[0]?.children || [];
-            }
-          }
-        }
-        break;
-      }
+    // Plain text of the blockquote — used to match against source blocks.
+    let snippetText = '';
+    for (const tt of quoteTokens) {
+      if (tt.type === 'inline') snippetText += ' ' + tt.content;
     }
+    snippetText = snippetText.trim();
 
-    const target = snippet ? findTarget(snippet, blocks) : null;
-    const bodyHtml = md.renderer.render(inner, md.options, {});
-    notes.push({ target, snippet, html: bodyHtml });
+    // Collect following commentary tokens up to the next blockquote/heading.
+    let cEnd = bqEnd;
+    let k = bqEnd + 1;
+    while (k < tokens.length) {
+      const tk = tokens[k];
+      if (tk.level === 0 && (tk.type === 'blockquote_open' || tk.type === 'heading_open')) break;
+      cEnd = k;
+      k++;
+    }
+    const commentaryTokens = tokens.slice(bqEnd + 1, cEnd + 1);
 
-    i = end;
+    notes.push({
+      target: findTarget(snippetText, blocks),
+      snippet: snippetText,
+      quoteHtml: md.renderer.render(quoteTokens, md.options, {}),
+      commentaryHtml: md.renderer.render(commentaryTokens, md.options, {}),
+    });
+
+    i = cEnd + 1;
   }
   return notes;
 }
@@ -185,6 +180,9 @@ app.get('/view/:name', (req, res) => {
 <body class="viewer">
 <header><a href="/">&larr; index</a> <strong>${name}</strong></header>
 <main>
+  <h2 class="col-header h-doc">Document</h2>
+  <h2 class="col-header h-notes">Notes <span id="notes-count" class="count"></span></h2>
+  <h2 class="col-header h-analysis">Analysis</h2>
   <article id="doc"></article>
   <aside id="notes" class="annot-col"></aside>
   <aside id="analysis"></aside>
