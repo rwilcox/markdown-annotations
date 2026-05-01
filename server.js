@@ -2,11 +2,33 @@ import express from 'express';
 import MarkdownIt from 'markdown-it';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CONTENT_DIR = path.resolve(process.env.CONTENT_DIR || path.join(__dirname, 'content'));
+
+/**
+ * Content directory resolution (in priority order):
+ *   1. --content-dir <path>  CLI flag
+ *   2. CONTENT_DIR           env var
+ *   3. ~/Documents/markdown_analysis  (default)
+ *
+ * A leading `~` in any of those is expanded to the user's home directory.
+ */
+function resolveContentDir() {
+  const args = process.argv.slice(2);
+  let cli = null;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--content-dir' && args[i + 1]) cli = args[i + 1];
+    else if (args[i].startsWith('--content-dir=')) cli = args[i].slice('--content-dir='.length);
+  }
+  const raw = cli || process.env.CONTENT_DIR || path.join(os.homedir(), 'Documents', 'markdown_analysis');
+  const expanded = raw.startsWith('~') ? path.join(os.homedir(), raw.slice(1)) : raw;
+  return path.resolve(expanded);
+}
+
+const CONTENT_DIR = resolveContentDir();
 const PORT = Number(process.env.PORT || 3000);
 
 const md = new MarkdownIt({ html: false, linkify: true, typographer: true });
@@ -192,6 +214,12 @@ app.get('/view/:name', (req, res) => {
 </body></html>`);
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
+  try {
+    await fs.mkdir(CONTENT_DIR, { recursive: true });
+  } catch (err) {
+    console.error(`Could not create content dir ${CONTENT_DIR}:`, err.message);
+  }
   console.log(`Serving ${CONTENT_DIR} on http://localhost:${PORT}`);
+  console.log('  override with --content-dir <path> or CONTENT_DIR env var');
 });
