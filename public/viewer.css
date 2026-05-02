@@ -81,16 +81,26 @@ body.viewer main {
 .edit-btn:hover { background: #f0f0f0; }
 
 /* Editor mode for notes/analysis columns */
-.is-editing { padding: 0 !important; background: #fff !important; }
+.is-editing {
+  padding: 0 !important;
+  background: #fff !important;
+  /* Float with the viewport so the textarea stays in view while scrolling. */
+  position: sticky;
+  top: 4rem;
+  max-height: calc(100vh - 5rem);
+  overflow-y: auto;       /* if textarea + bar exceed viewport, scroll inside */
+}
 .editor-textarea {
+  display: block;
   width: 100%;
-  min-height: 60vh;
+  min-height: 6rem;
   font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   padding: 0.75rem;
   border: 1px solid var(--analysis-border);
   border-radius: 4px;
-  resize: vertical;
+  resize: none;
   box-sizing: border-box;
+  overflow: hidden;       /* JS sizes height to content; no inner scrollbar */
 }
 .editor-bar {
   display: flex;
@@ -110,8 +120,6 @@ body.viewer main {
 .editor-bar .btn-save:hover:not(:disabled) { background: #244e96; }
 .editor-bar button:disabled { opacity: 0.6; cursor: wait; }
 .editor-status { font-size: 0.85rem; color: var(--muted); }
-/* When editing, drop the sticky behavior so the textarea can grow naturally. */
-.is-editing#analysis { position: static; max-height: none; overflow: visible; }
 .h-doc      { grid-area: h-doc; }
 .h-notes    { grid-area: h-notes; }
 .h-analysis { grid-area: h-analysis; }
@@ -219,6 +227,8 @@ body.viewer main {
   .annot-col { position: static; min-height: 0; }
   .note { position: static; margin: 0.5rem 0; }
   #analysis, .h-analysis { position: static; max-height: none; }
+  .is-editing { position: static; max-height: none; display: block; }
+  .editor-textarea { min-height: 60vh; resize: vertical; }
 }
 
 /* --- Ask the LLM panel --- */

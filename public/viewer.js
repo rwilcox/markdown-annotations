@@ -128,6 +128,14 @@ function enterEditMode(kind) {
   ta.value = src;
   container.appendChild(ta);
 
+  // Autosize the textarea to its content so it's exactly as tall as needed.
+  // The sticky parent caps it at viewport height and scrolls if it overflows.
+  const autosize = () => {
+    ta.style.height = 'auto';
+    ta.style.height = ta.scrollHeight + 'px';
+  };
+  ta.addEventListener('input', autosize);
+
   const bar = document.createElement('div');
   bar.className = 'editor-bar';
   const save = document.createElement('button');
@@ -145,6 +153,7 @@ function enterEditMode(kind) {
 
   setEditButton(kind, true);
   ta.focus();
+  autosize();
 
   save.addEventListener('click', async () => {
     save.disabled = cancel.disabled = true;
