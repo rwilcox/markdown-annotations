@@ -285,10 +285,10 @@ app.get('/view/:name', (req, res) => {
   <aside id="analysis"></aside>
 </main>
 <section id="ask">
-  <h2 class="col-header">Ask the LLM</h2>
+  <h2 class="col-header">Continue the conversation</h2>
   <div id="ask-log"></div>
   <form id="ask-form">
-    <textarea id="ask-input" rows="2" placeholder="Ask a question about this document…"></textarea>
+    <textarea id="ask-input" rows="2" placeholder="Next question…"></textarea>
     <button type="submit" id="ask-send">ask</button>
   </form>
 </section>

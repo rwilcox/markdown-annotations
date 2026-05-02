@@ -122,11 +122,20 @@ function enterEditMode(kind) {
 
   container.classList.add('is-editing');
   container.innerHTML = '';
+  // layoutColumn() sets an inline min-height equal to the cumulative cascade
+  // height of the note cards. Clear it so the CSS min-height: 100% wins.
+  container.style.minHeight = '';
+
+  // Inner sticky wrapper — its containing block is the (tall) grid cell, so
+  // it stays pinned to the viewport for the entire doc-column scroll height.
+  const sticky = document.createElement('div');
+  sticky.className = 'editor-sticky';
+  container.appendChild(sticky);
 
   const ta = document.createElement('textarea');
   ta.className = 'editor-textarea';
   ta.value = src;
-  container.appendChild(ta);
+  sticky.appendChild(ta);
 
   // Autosize the textarea to its content so it's exactly as tall as needed.
   // The sticky parent caps it at viewport height and scrolls if it overflows.
@@ -149,7 +158,7 @@ function enterEditMode(kind) {
   const status = document.createElement('span');
   status.className = 'editor-status';
   bar.append(save, cancel, status);
-  container.appendChild(bar);
+  sticky.appendChild(bar);
 
   setEditButton(kind, true);
   ta.focus();

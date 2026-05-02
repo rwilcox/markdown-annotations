@@ -80,15 +80,31 @@ body.viewer main {
 }
 .edit-btn:hover { background: #f0f0f0; }
 
-/* Editor mode for notes/analysis columns */
-.is-editing {
+/* Editor mode for notes/analysis columns.
+ *
+ * The grid cell (.annot-col / #analysis) keeps its natural full-row height
+ * so the inner .editor-sticky wrapper has the entire doc-column height to
+ * stick across. position: sticky on the wrapper keeps the textarea pinned
+ * to top: 4rem as you scroll past the editor's own height.
+ */
+.annot-col.is-editing,
+#analysis.is-editing {
   padding: 0 !important;
-  background: #fff !important;
-  /* Float with the viewport so the textarea stays in view while scrolling. */
+  background: transparent !important;
+  min-height: 100%;        /* fill the grid cell so the sticky child has room */
+  border: 0;               /* analysis pane styling moves to .editor-sticky */
+}
+.editor-sticky {
   position: sticky;
   top: 4rem;
   max-height: calc(100vh - 5rem);
-  overflow-y: auto;       /* if textarea + bar exceed viewport, scroll inside */
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--analysis-border);
+  border-radius: 4px;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
 }
 .editor-textarea {
   display: block;
