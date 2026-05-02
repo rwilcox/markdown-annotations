@@ -220,3 +220,74 @@ body.viewer main {
   .note { position: static; margin: 0.5rem 0; }
   #analysis, .h-analysis { position: static; max-height: none; }
 }
+
+/* --- Ask the LLM panel --- */
+#ask {
+  max-width: 60rem;
+  margin: 1rem 1.5rem 3rem;
+  padding: 1rem 1.25rem;
+  background: #fff;
+  border: 1px solid #e3e3e3;
+  border-radius: 6px;
+}
+#ask .col-header { border-bottom: 1px solid #ddd; margin-bottom: 0.75rem; }
+#ask-log { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 0.75rem; }
+.ask-turn {
+  border-left: 3px solid #ccc;
+  padding: 0.4rem 0.75rem;
+  background: #fafafa;
+  border-radius: 3px;
+}
+.ask-turn.q { border-left-color: var(--link); }
+.ask-turn.a { border-left-color: #6aa84f; }
+.ask-turn .who {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+.ask-turn .body p:first-child { margin-top: 0; }
+.ask-turn .body p:last-child { margin-bottom: 0; }
+.ask-turn.error { border-left-color: #c66; background: #ffecec; }
+
+.jump-link {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--link);
+  text-decoration: none;
+  border: 1px solid var(--link);
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+}
+.jump-link:hover { background: var(--link); color: #fff; }
+
+#doc [data-anchor].flash {
+  animation: doc-flash 1.4s ease-out;
+}
+@keyframes doc-flash {
+  0%   { background: #ffe27a; }
+  100% { background: transparent; }
+}
+
+#ask-form { display: flex; gap: 0.5rem; align-items: flex-start; }
+#ask-input {
+  flex: 1;
+  font: 14px/1.4 -apple-system, BlinkMacSystemFont, sans-serif;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  resize: vertical;
+}
+#ask-send {
+  font-size: 0.9rem;
+  padding: 0.45rem 0.9rem;
+  background: var(--link);
+  color: #fff;
+  border: 1px solid var(--link);
+  border-radius: 4px;
+  cursor: pointer;
+}
+#ask-send:hover:not(:disabled) { background: #244e96; }
+#ask-send:disabled { opacity: 0.6; cursor: wait; }

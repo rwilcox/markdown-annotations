@@ -5,6 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { askLLM } from './llm.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -223,6 +224,45 @@ app.put('/api/doc/:name/:kind', express.text({ type: '*/*', limit: '5mb' }), asy
   }
 });
 
+/**
+ * Ask the LLM a question about the source document. The question is
+ * appended to the doc text and sent on stdin to the `llm` CLI.
+ */
+app.post('/api/doc/:name/ask', express.json({ limit: '1mb' }), async (req, res) => {
+  const name = req.params.name;
+  const question = (req.body?.question || '').trim();
+  if (!question) return res.status(400).json({ error: 'question is required' });
+
+  const docPath = path.join(CONTENT_DIR, name + '.md');
+  const docSrc = await readIfExists(docPath);
+  if (docSrc == null) return res.status(404).json({ error: 'doc not found' });
+
+  try {
+    const answer = await askLLM({ docSource: docSrc, question });
+    // Append the exchange to the source document so the conversation lives
+    // alongside the file itself.
+    const sep = docSrc.endsWith('\n') ? '' : '\n';
+    const transcript = `${sep}\n---\n\nUser: ${question}\n\n---\n\nLLM: ${answer}\n`;
+    await fs.appendFile(docPath, transcript, 'utf8');
+
+    // Re-parse the whole doc to find the anchor of the freshly-appended LLM
+    // block, so the client can deep-link straight to it.
+    const updated = await fs.readFile(docPath, 'utf8');
+    const { blocks: updatedBlocks } = renderDoc(updated);
+    const llmBlock = [...updatedBlocks].reverse().find(b =>
+      b.normalizedText.startsWith('llm:')
+    );
+
+    res.json({
+      answer,
+      answerHtml: md.render(answer),
+      answerAnchor: llmBlock ? llmBlock.anchor : null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: String(err.message || err) });
+  }
+});
+
 app.get('/view/:name', (req, res) => {
   const name = req.params.name;
   res.type('html').send(`<!doctype html>
@@ -244,6 +284,14 @@ app.get('/view/:name', (req, res) => {
   <aside id="notes" class="annot-col"></aside>
   <aside id="analysis"></aside>
 </main>
+<section id="ask">
+  <h2 class="col-header">Ask the LLM</h2>
+  <div id="ask-log"></div>
+  <form id="ask-form">
+    <textarea id="ask-input" rows="2" placeholder="Ask a question about this document…"></textarea>
+    <button type="submit" id="ask-send">ask</button>
+  </form>
+</section>
 <script>window.DOC_NAME = ${JSON.stringify(name)};</script>
 <script type="module" src="/static/viewer.js"></script>
 </body></html>`);
