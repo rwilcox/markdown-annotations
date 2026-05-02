@@ -33,7 +33,7 @@ When a user wants to highlight, reply to, or expand on some generated content, t
 
 ```markdown
 
-> this is text from the prompt document
+> this is text from the conversation document
 
 This is my (optional) commentary.
 
