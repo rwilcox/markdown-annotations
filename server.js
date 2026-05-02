@@ -190,8 +190,37 @@ app.get('/api/doc/:name', async (req, res) => {
     name,
     docHtml,
     notes: renderNotes(notesSrc, blocks),
+    notesSrc,
     analysisHtml: analysisSrc ? md.render(analysisSrc) : '',
+    analysisSrc,
   });
+});
+
+/**
+ * Save edits made in the browser back to disk.
+ * `kind` must be `notes` or `analysis` — we never let the client write the
+ * source `.md` itself, and the resolved file path is required to live
+ * inside CONTENT_DIR (no traversal).
+ */
+app.put('/api/doc/:name/:kind', express.text({ type: '*/*', limit: '5mb' }), async (req, res) => {
+  const { name, kind } = req.params;
+  if (kind !== 'notes' && kind !== 'analysis') {
+    return res.status(400).json({ error: 'kind must be "notes" or "analysis"' });
+  }
+  const filename = `${name}.${kind}.md`;
+  const target = path.resolve(CONTENT_DIR, filename);
+  if (path.dirname(target) !== CONTENT_DIR) {
+    return res.status(400).json({ error: 'invalid path' });
+  }
+  // Require the source doc to exist — don't let arbitrary names be created.
+  const docExists = await readIfExists(path.join(CONTENT_DIR, name + '.md'));
+  if (docExists == null) return res.status(404).json({ error: 'doc not found' });
+  try {
+    await fs.writeFile(target, req.body ?? '', 'utf8');
+    res.json({ ok: true, path: target });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
 });
 
 app.get('/view/:name', (req, res) => {
@@ -203,8 +232,14 @@ app.get('/view/:name', (req, res) => {
 <header><a href="/">&larr; index</a> <strong>${name}</strong></header>
 <main>
   <h2 class="col-header h-doc">Document</h2>
-  <h2 class="col-header h-notes">Notes <span id="notes-count" class="count"></span></h2>
-  <h2 class="col-header h-analysis">Analysis</h2>
+  <h2 class="col-header h-notes">
+    Notes <span id="notes-count" class="count"></span>
+    <button class="edit-btn" data-edit="notes" type="button">edit</button>
+  </h2>
+  <h2 class="col-header h-analysis">
+    Analysis
+    <button class="edit-btn" data-edit="analysis" type="button">edit</button>
+  </h2>
   <article id="doc"></article>
   <aside id="notes" class="annot-col"></aside>
   <aside id="analysis"></aside>

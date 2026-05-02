@@ -65,6 +65,53 @@ body.viewer main {
   color: #999;
   margin-left: 0.25rem;
 }
+.edit-btn {
+  float: right;
+  font: inherit;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.72rem;
+  padding: 0.1rem 0.45rem;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  cursor: pointer;
+  color: #444;
+}
+.edit-btn:hover { background: #f0f0f0; }
+
+/* Editor mode for notes/analysis columns */
+.is-editing { padding: 0 !important; background: #fff !important; }
+.editor-textarea {
+  width: 100%;
+  min-height: 60vh;
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  padding: 0.75rem;
+  border: 1px solid var(--analysis-border);
+  border-radius: 4px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.editor-bar {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+.editor-bar button {
+  font-size: 0.85rem;
+  padding: 0.3rem 0.8rem;
+  border: 1px solid #aaa;
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+}
+.editor-bar .btn-save { background: #2a5db0; color: #fff; border-color: #2a5db0; }
+.editor-bar .btn-save:hover:not(:disabled) { background: #244e96; }
+.editor-bar button:disabled { opacity: 0.6; cursor: wait; }
+.editor-status { font-size: 0.85rem; color: var(--muted); }
+/* When editing, drop the sticky behavior so the textarea can grow naturally. */
+.is-editing#analysis { position: static; max-height: none; overflow: visible; }
 .h-doc      { grid-area: h-doc; }
 .h-notes    { grid-area: h-notes; }
 .h-analysis { grid-area: h-analysis; }

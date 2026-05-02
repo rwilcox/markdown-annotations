@@ -7,6 +7,12 @@ const notesEl = document.getElementById('notes');
 const analysisEl = document.getElementById('analysis');
 const NOTE_GAP = 8; // px between stacked notes
 
+// Latest data from the server, kept so the editor can populate its textarea
+// without needing a second fetch.
+let latest = { notesSrc: '', analysisSrc: '' };
+// Track which columns are currently in edit mode so a refresh leaves them alone.
+const editing = { notes: false, analysis: false };
+
 async function load() {
   const res = await fetch(`/api/doc/${encodeURIComponent(window.DOC_NAME)}`);
   if (!res.ok) {
@@ -14,14 +20,22 @@ async function load() {
     return;
   }
   const data = await res.json();
+  latest = data;
+
   docEl.innerHTML = data.docHtml;
-  mountNotes(notesEl, data.notes);
-  const countEl = document.getElementById('notes-count');
-  if (countEl) countEl.textContent = `(${data.notes.length})`;
-  analysisEl.innerHTML = data.analysisHtml || '';
+
+  if (!editing.notes) {
+    mountNotes(notesEl, data.notes);
+    const countEl = document.getElementById('notes-count');
+    if (countEl) countEl.textContent = `(${data.notes.length})`;
+  }
+  if (!editing.analysis) {
+    analysisEl.innerHTML = data.analysisHtml || '';
+  }
+
   // Wait for fonts/images to settle before measuring.
   await document.fonts?.ready;
-  layoutColumn(notesEl);
+  if (!editing.notes) layoutColumn(notesEl);
   wireInteractions();
 }
 
@@ -51,7 +65,7 @@ function layoutColumn(container) {
     const target = targetId && docEl.querySelector(`[data-anchor="${targetId}"]`);
     const desired = target
       ? target.getBoundingClientRect().top - colRect.top
-      : el.offsetTop; // orphan: leave wherever it lands
+      : el.offsetTop;
     return { el, desired };
   });
   placements.sort((a, b) => a.desired - b.desired);
@@ -92,14 +106,92 @@ function wireInteractions() {
   let resizeRaf = 0;
   window.addEventListener('resize', () => {
     cancelAnimationFrame(resizeRaf);
-    resizeRaf = requestAnimationFrame(() => layoutColumn(notesEl));
+    resizeRaf = requestAnimationFrame(() => {
+      if (!editing.notes) layoutColumn(notesEl);
+    });
   });
 }
 
-function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, c => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  }[c]));
+// --- editing -----------------------------------------------------------
+
+function enterEditMode(kind) {
+  if (editing[kind]) return;
+  editing[kind] = true;
+  const container = kind === 'notes' ? notesEl : analysisEl;
+  const src = kind === 'notes' ? (latest.notesSrc || '') : (latest.analysisSrc || '');
+
+  container.classList.add('is-editing');
+  container.innerHTML = '';
+
+  const ta = document.createElement('textarea');
+  ta.className = 'editor-textarea';
+  ta.value = src;
+  container.appendChild(ta);
+
+  const bar = document.createElement('div');
+  bar.className = 'editor-bar';
+  const save = document.createElement('button');
+  save.type = 'button';
+  save.textContent = 'save';
+  save.className = 'btn-save';
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.textContent = 'cancel';
+  cancel.className = 'btn-cancel';
+  const status = document.createElement('span');
+  status.className = 'editor-status';
+  bar.append(save, cancel, status);
+  container.appendChild(bar);
+
+  setEditButton(kind, true);
+  ta.focus();
+
+  save.addEventListener('click', async () => {
+    save.disabled = cancel.disabled = true;
+    status.textContent = 'saving…';
+    try {
+      const res = await fetch(
+        `/api/doc/${encodeURIComponent(window.DOC_NAME)}/${kind}`,
+        { method: 'PUT', headers: { 'Content-Type': 'text/plain' }, body: ta.value }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // Update our cached source so the editor would re-open with current text
+      // if we stayed editing — but we exit edit mode and refresh the view.
+      if (kind === 'notes') latest.notesSrc = ta.value;
+      else latest.analysisSrc = ta.value;
+      exitEditMode(kind);
+      await load();
+    } catch (err) {
+      status.textContent = `error: ${err.message}`;
+      save.disabled = cancel.disabled = false;
+    }
+  });
+
+  cancel.addEventListener('click', async () => {
+    exitEditMode(kind);
+    await load();
+  });
 }
+
+function exitEditMode(kind) {
+  editing[kind] = false;
+  const container = kind === 'notes' ? notesEl : analysisEl;
+  container.classList.remove('is-editing');
+  container.innerHTML = '';
+  setEditButton(kind, false);
+}
+
+function setEditButton(kind, isEditing) {
+  const btn = document.querySelector(`.edit-btn[data-edit="${kind}"]`);
+  if (btn) btn.textContent = isEditing ? 'editing…' : 'edit';
+}
+
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.edit-btn');
+  if (!btn) return;
+  const kind = btn.dataset.edit;
+  if (editing[kind]) return; // already editing; ignore
+  enterEditMode(kind);
+});
 
 load();
