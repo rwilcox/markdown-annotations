@@ -2,7 +2,7 @@
 
 Chat interfaces are optimized for the next message; research is optimized for the previous one. This project replaces the chat scrollback with an annotated document — a place where the good chunks of an LLM conversation can be marked, summarized, and reread.
 
-The solution is [three Markdown documents](https://www.youtube.com/watch?v=iR8T1h3_jps).
+The solution is [three Markdown documents](https://www.youtube.com/watch?v=iR8T1h3_jps) building towards human/machine knowledge exploration and analysis.
 
 ## Interested in supporting the idea of alternatives LLM interfaces?
 
