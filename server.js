@@ -74,7 +74,11 @@ function renderDoc(source) {
     if (!text.trim()) continue;
     const anchor = hashAnchor(text);
     t.attrJoin('data-anchor', anchor);
-    blocks.push({ anchor, normalizedText: normalize(text) });
+    // Tag conversation-turn blocks so the viewer can highlight them.
+    const norm = normalize(text);
+    if (norm.startsWith('user:')) t.attrJoin('class', 'doc-user');
+    else if (norm.startsWith('llm:')) t.attrJoin('class', 'doc-llm');
+    blocks.push({ anchor, normalizedText: norm });
   }
   return { html: md.renderer.render(tokens, md.options, {}), blocks };
 }
@@ -146,6 +150,46 @@ function findTarget(snippet, blocks) {
   return null;
 }
 
+/**
+ * Parse a `<name>.toc.md` file as a markdown list. Each list item's text is
+ * used to look up a target anchor in the source document. If the item is a
+ * markdown link `[label](search text)`, the label is shown and the parens
+ * text is what we substring-match. Otherwise the item text is both the
+ * label and the search target.
+ */
+function renderToc(source, blocks) {
+  if (!source) return '';
+  const tokens = md.parse(source, {});
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (t.type !== 'list_item_open') continue;
+
+    // Find the first inline token inside this list item.
+    let depth = 1;
+    let inlineToken = null;
+    for (let j = i + 1; j < tokens.length && depth > 0; j++) {
+      if (tokens[j].type === 'list_item_open') depth++;
+      else if (tokens[j].type === 'list_item_close') depth--;
+      if (tokens[j].type === 'inline' && inlineToken === null) {
+        inlineToken = tokens[j];
+      }
+    }
+    if (!inlineToken) continue;
+
+    const linkMatch = inlineToken.content.match(/^\[(.+?)\]\((.+?)\)$/);
+    const searchTarget = linkMatch ? linkMatch[2] : inlineToken.content;
+    const anchor = findTarget(searchTarget, blocks);
+    if (anchor) t.attrJoin('data-target', anchor);
+
+    // If the user wrote `[label](search text)`, render only the label.
+    if (linkMatch) {
+      inlineToken.content = linkMatch[1];
+      inlineToken.children = md.parseInline(linkMatch[1], {})[0]?.children || [];
+    }
+  }
+  return md.renderer.render(tokens, md.options, {});
+}
+
 async function readIfExists(p) {
   try { return await fs.readFile(p, 'utf8'); } catch { return null; }
 }
@@ -155,7 +199,8 @@ async function listDocs() {
   return entries
     .filter(e => e.isFile() && e.name.endsWith('.md')
       && !e.name.endsWith('.notes.md')
-      && !e.name.endsWith('.analysis.md'))
+      && !e.name.endsWith('.analysis.md')
+      && !e.name.endsWith('.toc.md'))
     .map(e => e.name.replace(/\.md$/, ''))
     .sort();
 }
@@ -184,8 +229,10 @@ app.get('/api/doc/:name', async (req, res) => {
   const docSrc = await readIfExists(docPath);
   if (docSrc == null) return res.status(404).json({ error: 'doc not found' });
   const analysisPath = path.join(CONTENT_DIR, name + '.analysis.md');
+  const tocPath = path.join(CONTENT_DIR, name + '.toc.md');
   const notesSrc = (await readIfExists(notesPath)) || '';
   const analysisSrc = (await readIfExists(analysisPath)) || '';
+  const tocSrc = (await readIfExists(tocPath)) || '';
   const { html: docHtml, blocks } = renderDoc(docSrc);
   res.json({
     name,
@@ -194,6 +241,7 @@ app.get('/api/doc/:name', async (req, res) => {
     notesSrc,
     analysisHtml: analysisSrc ? md.render(analysisSrc) : '',
     analysisSrc,
+    tocHtml: renderToc(tocSrc, blocks),
   });
 });
 
@@ -269,7 +317,15 @@ app.get('/view/:name', (req, res) => {
 <html><head><meta charset="utf-8"><title>${name}</title>
 <link rel="stylesheet" href="/static/viewer.css"></head>
 <body class="viewer">
-<header><a href="/">&larr; index</a> <strong>${name}</strong></header>
+<header>
+  <a href="/">&larr; index</a>
+  <strong>${name}</strong>
+  <details id="toc-disclosure">
+    <summary>Contents</summary>
+    <input type="search" id="toc-filter" placeholder="filter…" autocomplete="off">
+    <div id="toc"></div>
+  </details>
+</header>
 <main>
   <h2 class="col-header h-doc">Document</h2>
   <h2 class="col-header h-notes">

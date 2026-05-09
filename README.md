@@ -10,7 +10,7 @@ The solution is [three Markdown documents](https://www.youtube.com/watch?v=iR8T1
 
 # The Markdown Annotation Spec
 
-Each research topic has 2-3 associated Markdown documents
+Each research topic has 2-4 associated Markdown documents
 
 ## The Conversation Document (.md)
 
@@ -45,9 +45,29 @@ Markdown Annotator will render these comments beside the appropriate area in the
 
 Research with an LLM is a means, not an end: the goal is a plan, a position, a way forward — not the conversation that produced it. Quoting and annotating individual passages captures the local insights; broader, synthesizing thoughts go in the analysis document.
 
+## The Table of Contents Document (.toc.md)
+
+A long conversation document gets hard to scan. An optional `<name>.toc.md` adds a searchable, click-to-jump outline that lives in a disclosure panel in the page header.
+
+The file is just a markdown bullet list. Each item is one navigation entry; nested lists become nested entries.
+
+```markdown
+- [Friendly label](text to substring-match in the doc)
+- A plain entry that is also the search text
+  - Nested entries work too
+```
+
+How an entry is matched to a document location:
+
+  * If the item is a markdown link `[label](text)`, the **label** is shown in the table of contents and the **text in parentheses** is substring-matched (case- and whitespace-insensitive) against the document's blocks. The first matching paragraph/heading/list is the click target.
+  * If the item is plain text, that text serves as both the displayed label and the search target.
+  * Items that don't match anything in the document render in muted gray (no click target).
+
+Clicking an entry smooth-scrolls the document column to the matched block and briefly flashes it. The disclosure panel also has a filter input that hides non-matching entries as you type.
+
 # What this all means
 
-With these three documents you have a record of the conversation you can return to, highlights and thoughts you believed were useful in the moment, and the analysis/syntheses of these ideas towards a comprehensive plan of action.
+With these series of documents you have a record of the conversation you can return to, highlights and thoughts you believed were useful in the moment, and the analysis/syntheses of these ideas towards a comprehensive plan of action.
 
 # The UI in action
 

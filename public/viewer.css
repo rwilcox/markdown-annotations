@@ -31,7 +31,69 @@ body.viewer header {
   border-bottom: 1px solid #ddd;
   background: #fff;
   position: sticky; top: 0; z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
+
+#toc-disclosure {
+  position: relative;
+  margin-left: auto;
+}
+#toc-disclosure > summary {
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.9rem;
+  color: var(--link);
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--link);
+  border-radius: 3px;
+  user-select: none;
+}
+#toc-disclosure > summary::before {
+  content: '▸ ';
+  display: inline-block;
+  transition: transform 150ms;
+}
+#toc-disclosure[open] > summary::before {
+  transform: rotate(90deg);
+}
+#toc-disclosure[open] > summary { background: var(--link); color: #fff; }
+
+#toc-disclosure[open] > #toc-filter,
+#toc-disclosure[open] > #toc {
+  position: absolute;
+  right: 0;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+}
+#toc-filter {
+  top: 2.4rem;
+  width: 22rem;
+  padding: 0.4rem 0.6rem;
+  font: inherit;
+  font-size: 0.9rem;
+  z-index: 6;
+}
+#toc {
+  top: 5rem;
+  width: 22rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 0.5rem 0.75rem;
+  z-index: 6;
+}
+#toc ul, #toc ol { padding-left: 1.2rem; margin: 0.25rem 0; }
+#toc li { margin: 0.15rem 0; font-size: 0.9rem; }
+#toc li[data-target] {
+  cursor: pointer;
+  color: var(--link);
+}
+#toc li[data-target]:hover { text-decoration: underline; }
+#toc li.toc-hidden { display: none; }
+#toc li:not([data-target]) { color: #999; }
 
 body.viewer main {
   display: grid;
@@ -158,6 +220,23 @@ body.viewer main {
 }
 #doc [data-anchor].is-hovered {
   background: var(--highlight);
+}
+
+/* Conversation turns appended via "Ask the LLM" */
+#doc .doc-user,
+#doc .doc-llm {
+  padding: 0.6rem 0.9rem;
+  margin: 0.6rem 0;
+  border-left: 4px solid #ccc;
+  border-radius: 4px;
+}
+#doc .doc-user {
+  border-left-color: var(--link);
+  background: #eef3fb;
+}
+#doc .doc-llm {
+  border-left-color: #6aa84f;
+  background: #eef7e6;
 }
 
 .annot-col {

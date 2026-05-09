@@ -33,6 +33,8 @@ async function load() {
     analysisEl.innerHTML = data.analysisHtml || '';
   }
 
+  mountToc(data.tocHtml || '');
+
   // Wait for fonts/images to settle before measuring.
   await document.fonts?.ready;
   if (!editing.notes) layoutColumn(notesEl);
@@ -307,6 +309,57 @@ if (askForm) {
   });
 } else {
   console.warn('[ask] #ask-form not found in DOM');
+}
+
+// --- Table of contents ------------------------------------------------
+
+const tocEl = document.getElementById('toc');
+const tocDisclosure = document.getElementById('toc-disclosure');
+const tocFilter = document.getElementById('toc-filter');
+
+function mountToc(html) {
+  if (!tocEl) return;
+  tocEl.innerHTML = html;
+  // If there's no ToC for this doc, hide the disclosure entirely.
+  if (tocDisclosure) tocDisclosure.style.display = html ? '' : 'none';
+}
+
+if (tocEl) {
+  tocEl.addEventListener('click', (e) => {
+    const li = e.target.closest('li[data-target]');
+    if (!li) return;
+    const target = docEl.querySelector(`[data-anchor="${li.dataset.target}"]`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    target.classList.add('flash');
+    setTimeout(() => target.classList.remove('flash'), 1500);
+    if (tocDisclosure) tocDisclosure.open = false;
+  });
+}
+
+if (tocFilter) {
+  tocFilter.addEventListener('input', () => {
+    const q = tocFilter.value.trim().toLowerCase();
+    for (const li of tocEl.querySelectorAll('li')) {
+      // Match against just this item's own label, not its nested children.
+      const own = li.cloneNode(true);
+      own.querySelectorAll('ul, ol').forEach(n => n.remove());
+      const ownText = own.textContent.toLowerCase();
+      const descendantHit = !!li.querySelector('li[data-target]') &&
+        Array.from(li.querySelectorAll('li')).some(d => {
+          const c = d.cloneNode(true);
+          c.querySelectorAll('ul, ol').forEach(n => n.remove());
+          return c.textContent.toLowerCase().includes(q);
+        });
+      const hit = !q || ownText.includes(q) || descendantHit;
+      li.classList.toggle('toc-hidden', !hit);
+    }
+  });
+  if (tocDisclosure) {
+    tocDisclosure.addEventListener('toggle', () => {
+      if (tocDisclosure.open) tocFilter.focus();
+    });
+  }
 }
 
 load();
