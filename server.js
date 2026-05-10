@@ -34,6 +34,25 @@ const PORT = Number(process.env.PORT || 3000);
 
 const md = new MarkdownIt({ html: false, linkify: true, typographer: true });
 
+// Rewrite relative image src (e.g. `img/foo.png`, `./img/foo.png`) so they
+// resolve to /files/* — the static mount that serves CONTENT_DIR. Absolute
+// URLs (https://, //cdn..., /abs/path) are left alone.
+const defaultImageRule = md.renderer.rules.image || function (tokens, idx, opts, env, self) {
+  return self.renderToken(tokens, idx, opts);
+};
+md.renderer.rules.image = function (tokens, idx, opts, env, self) {
+  const token = tokens[idx];
+  const srcIdx = token.attrIndex('src');
+  if (srcIdx >= 0) {
+    const src = token.attrs[srcIdx][1];
+    const isAbsolute = /^[a-z][a-z0-9+\-.]*:/i.test(src) || src.startsWith('//') || src.startsWith('/');
+    if (!isAbsolute) {
+      token.attrs[srcIdx][1] = '/files/' + src.replace(/^\.\//, '');
+    }
+  }
+  return defaultImageRule(tokens, idx, opts, env, self);
+};
+
 /** Normalize text for stable hashing across small whitespace differences. */
 function normalize(text) {
   return text.replace(/\s+/g, ' ').trim().toLowerCase();
@@ -207,6 +226,9 @@ async function listDocs() {
 
 const app = express();
 app.use('/static', express.static(path.join(__dirname, 'public')));
+// Serve files (images, attachments) from the content directory so markdown
+// images written as `![alt](img/foo.png)` resolve correctly.
+app.use('/files', express.static(CONTENT_DIR));
 
 app.get('/', async (_req, res) => {
   try {
@@ -279,6 +301,7 @@ app.put('/api/doc/:name/:kind', express.text({ type: '*/*', limit: '5mb' }), asy
 app.post('/api/doc/:name/ask', express.json({ limit: '1mb' }), async (req, res) => {
   const name = req.params.name;
   const question = (req.body?.question || '').trim();
+  const noLlm = !!req.body?.noLlm;
   if (!question) return res.status(400).json({ error: 'question is required' });
 
   const docPath = path.join(CONTENT_DIR, name + '.md');
@@ -286,7 +309,10 @@ app.post('/api/doc/:name/ask', express.json({ limit: '1mb' }), async (req, res) 
   if (docSrc == null) return res.status(404).json({ error: 'doc not found' });
 
   try {
-    const answer = await askLLM({ docSource: docSrc, question });
+    // `noLlm` mode appends the user's text to the document with a placeholder
+    // LLM answer of "-" — useful for inserting a note inline without burning
+    // a model call.
+    const answer = noLlm ? '-' : await askLLM({ docSource: docSrc, question });
     // Append the exchange to the source document so the conversation lives
     // alongside the file itself.
     const sep = docSrc.endsWith('\n') ? '' : '\n';
@@ -305,6 +331,7 @@ app.post('/api/doc/:name/ask', express.json({ limit: '1mb' }), async (req, res) 
       answer,
       answerHtml: md.render(answer),
       answerAnchor: llmBlock ? llmBlock.anchor : null,
+      noLlm,
     });
   } catch (err) {
     res.status(500).json({ error: String(err.message || err) });
@@ -346,6 +373,7 @@ app.get('/view/:name', (req, res) => {
   <form id="ask-form">
     <textarea id="ask-input" rows="2" placeholder="Next question…"></textarea>
     <button type="submit" id="ask-send">ask</button>
+    <button type="button" id="ask-append" title="Append this text to the document without calling the LLM">append only</button>
   </form>
 </section>
 <script>window.DOC_NAME = ${JSON.stringify(name)};</script>

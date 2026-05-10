@@ -225,86 +225,102 @@ function escapeHtml(s) {
 const askForm = document.getElementById('ask-form');
 const askInput = document.getElementById('ask-input');
 const askSend = document.getElementById('ask-send');
+const askAppend = document.getElementById('ask-append');
 const askLog = document.getElementById('ask-log');
 
-console.log('[ask] init', { askForm, askInput, askSend, askLog });
+console.log('[ask] init', { askForm, askInput, askSend, askAppend, askLog });
 
 function appendTurn(kind, html) {
   const el = document.createElement('div');
   el.className = `ask-turn ${kind}`;
-  el.innerHTML = `<div class="who">${kind === 'q' ? 'you' : kind === 'a' ? 'llm' : 'error'}</div>` +
+  el.innerHTML = `<div class="who">${kind === 'q' ? 'you' : kind === 'a' ? 'llm' : kind === 'note' ? 'note' : 'error'}</div>` +
                  `<div class="body">${html}</div>`;
   askLog.appendChild(el);
   el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   return el;
 }
 
-if (askForm) {
-  askForm.addEventListener('submit', async (e) => {
-    console.log('[ask] submit fired');
-    e.preventDefault();
-    const question = askInput.value.trim();
-    console.log('[ask] question:', question);
-    if (!question) return;
+async function submitAsk({ noLlm }) {
+  const question = askInput.value.trim();
+  console.log('[ask] submit', { question, noLlm });
+  if (!question) return;
 
-    appendTurn('q', `<p>${escapeHtml(question)}</p>`);
-    askInput.value = '';
-    askSend.disabled = true;
-    askInput.disabled = true;
-    const pending = appendTurn('a', '<p><em>thinking…</em></p>');
+  appendTurn('q', `<p>${escapeHtml(question)}</p>`);
+  askInput.value = '';
+  askSend.disabled = true;
+  if (askAppend) askAppend.disabled = true;
+  askInput.disabled = true;
+  const pending = appendTurn(noLlm ? 'note' : 'a',
+    noLlm ? '<p><em>appending…</em></p>' : '<p><em>thinking…</em></p>');
 
-    try {
-      console.log('[ask] POST /api/doc/' + window.DOC_NAME + '/ask');
-      const res = await fetch(
-        `/api/doc/${encodeURIComponent(window.DOC_NAME)}/ask`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ question }),
-        }
-      );
-      console.log('[ask] response status', res.status);
-      const data = await res.json();
-      console.log('[ask] response body', data);
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-      pending.querySelector('.body').innerHTML = data.answerHtml || `<p>${escapeHtml(data.answer || '')}</p>`;
-      // The server appended the exchange to the source doc — refresh so the
-      // user sees it (and the notes column re-aligns to the new content).
-      await load();
-      // Add a deep-link to the freshly-appended LLM block in the document.
-      if (data.answerAnchor) {
-        const link = document.createElement('a');
-        link.href = '#';
-        link.className = 'jump-link';
-        link.textContent = '↑ open in document';
-        link.addEventListener('click', (ev) => {
-          ev.preventDefault();
-          const target = docEl.querySelector(`[data-anchor="${data.answerAnchor}"]`);
-          if (target) {
-            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            target.classList.add('flash');
-            setTimeout(() => target.classList.remove('flash'), 1500);
-          }
-        });
-        pending.appendChild(link);
+  try {
+    console.log('[ask] POST /api/doc/' + window.DOC_NAME + '/ask');
+    const res = await fetch(
+      `/api/doc/${encodeURIComponent(window.DOC_NAME)}/ask`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question, noLlm }),
       }
-    } catch (err) {
-      console.error('[ask] error', err);
-      pending.classList.remove('a');
-      pending.classList.add('error');
-      pending.querySelector('.who').textContent = 'error';
-      pending.querySelector('.body').innerHTML = `<p>${escapeHtml(err.message)}</p>`;
-    } finally {
-      askSend.disabled = false;
-      askInput.disabled = false;
-      askInput.focus();
+    );
+    console.log('[ask] response status', res.status);
+    const data = await res.json();
+    console.log('[ask] response body', data);
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    if (noLlm) {
+      pending.querySelector('.body').innerHTML = '<p><em>appended (no LLM call)</em></p>';
+    } else {
+      pending.querySelector('.body').innerHTML = data.answerHtml || `<p>${escapeHtml(data.answer || '')}</p>`;
     }
+    // The server appended the exchange to the source doc — refresh so the
+    // user sees it (and the notes column re-aligns to the new content).
+    await load();
+    // Add a deep-link to the freshly-appended block in the document.
+    if (data.answerAnchor) {
+      const link = document.createElement('a');
+      link.href = '#';
+      link.className = 'jump-link';
+      link.textContent = '↑ open in document';
+      link.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        const target = docEl.querySelector(`[data-anchor="${data.answerAnchor}"]`);
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          target.classList.add('flash');
+          setTimeout(() => target.classList.remove('flash'), 1500);
+        }
+      });
+      pending.appendChild(link);
+    }
+  } catch (err) {
+    console.error('[ask] error', err);
+    pending.classList.remove('a', 'note');
+    pending.classList.add('error');
+    pending.querySelector('.who').textContent = 'error';
+    pending.querySelector('.body').innerHTML = `<p>${escapeHtml(err.message)}</p>`;
+  } finally {
+    askSend.disabled = false;
+    if (askAppend) askAppend.disabled = false;
+    askInput.disabled = false;
+    askInput.focus();
+  }
+}
+
+if (askForm) {
+  askForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    submitAsk({ noLlm: false });
   });
 
-  // Cmd/Ctrl+Enter submits.
+  if (askAppend) {
+    askAppend.addEventListener('click', () => submitAsk({ noLlm: true }));
+  }
+
+  // Cmd/Ctrl+Enter submits (with LLM); Cmd/Ctrl+Shift+Enter appends only.
   askInput.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      askForm.requestSubmit();
+      e.preventDefault();
+      submitAsk({ noLlm: e.shiftKey });
     }
   });
 } else {

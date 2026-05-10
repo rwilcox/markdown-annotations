@@ -212,6 +212,14 @@ body.viewer main {
   border-radius: 6px;
   max-width: 100%;
 }
+#doc img,
+.note img,
+#analysis img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.5rem 0;
+}
 
 #doc [data-anchor] {
   scroll-margin-top: 4rem;
@@ -345,6 +353,7 @@ body.viewer main {
 }
 .ask-turn.q { border-left-color: var(--link); }
 .ask-turn.a { border-left-color: #6aa84f; }
+.ask-turn.note { border-left-color: #b58900; background: #fdf6dc; }
 .ask-turn .who {
   font-size: 0.7rem;
   text-transform: uppercase;
@@ -396,3 +405,14 @@ body.viewer main {
 }
 #ask-send:hover:not(:disabled) { background: #244e96; }
 #ask-send:disabled { opacity: 0.6; cursor: wait; }
+#ask-append {
+  font-size: 0.9rem;
+  padding: 0.45rem 0.9rem;
+  background: #fff;
+  color: var(--link);
+  border: 1px solid var(--link);
+  border-radius: 4px;
+  cursor: pointer;
+}
+#ask-append:hover:not(:disabled) { background: #eef3fb; }
+#ask-append:disabled { opacity: 0.6; cursor: wait; }
