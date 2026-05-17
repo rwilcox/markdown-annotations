@@ -358,6 +358,7 @@ app.get('/view/:name', (req, res) => {
   <h2 class="col-header h-notes">
     Notes <span id="notes-count" class="count"></span>
     <button class="edit-btn" data-edit="notes" type="button">edit</button>
+    <button class="edit-btn collapse-btn" id="notes-collapse" type="button" aria-pressed="false">collapse</button>
   </h2>
   <h2 class="col-header h-analysis">
     Analysis

@@ -12,6 +12,13 @@ const NOTE_GAP = 8; // px between stacked notes
 let latest = { notesSrc: '', analysisSrc: '' };
 // Track which columns are currently in edit mode so a refresh leaves them alone.
 const editing = { notes: false, analysis: false };
+// When true, layoutColumn ignores target Y and stacks notes flush against each
+// other. Persisted per-doc in localStorage.
+const collapseKey = () => `notes-collapsed:${window.DOC_NAME}`;
+let notesCollapsed = (() => {
+  try { return localStorage.getItem(collapseKey()) === '1'; }
+  catch { return false; }
+})();
 
 async function load() {
   const res = await fetch(`/api/doc/${encodeURIComponent(window.DOC_NAME)}`);
@@ -35,11 +42,17 @@ async function load() {
 
   mountToc(data.tocHtml || '');
 
+  applyCollapseButton();
+
   // Wait for fonts/images to settle before measuring.
   await document.fonts?.ready;
   if (!editing.notes) layoutColumn(notesEl);
   wireInteractions();
 }
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest('#notes-collapse')) toggleCollapse();
+});
 
 function mountNotes(container, notes) {
   container.innerHTML = '';
@@ -65,12 +78,14 @@ function layoutColumn(container) {
   const placements = noteEls.map(el => {
     const targetId = el.dataset.target;
     const target = targetId && docEl.querySelector(`[data-anchor="${targetId}"]`);
-    const desired = target
-      ? target.getBoundingClientRect().top - colRect.top
-      : el.offsetTop;
+    // In collapsed mode we ignore the target Y entirely and just stack the
+    // notes flush from the top of the column.
+    const desired = notesCollapsed
+      ? 0
+      : (target ? target.getBoundingClientRect().top - colRect.top : el.offsetTop);
     return { el, desired };
   });
-  placements.sort((a, b) => a.desired - b.desired);
+  if (!notesCollapsed) placements.sort((a, b) => a.desired - b.desired);
 
   let cursor = 0;
   for (const p of placements) {
@@ -79,6 +94,25 @@ function layoutColumn(container) {
     cursor = top + p.el.offsetHeight + NOTE_GAP;
   }
   container.style.minHeight = `${cursor}px`;
+}
+
+function applyCollapseButton() {
+  const btn = document.getElementById('notes-collapse');
+  if (!btn) return;
+  btn.textContent = notesCollapsed ? 'expand' : 'collapse';
+  btn.setAttribute('aria-pressed', notesCollapsed ? 'true' : 'false');
+}
+
+function toggleCollapse() {
+  notesCollapsed = !notesCollapsed;
+  try { localStorage.setItem(collapseKey(), notesCollapsed ? '1' : '0'); }
+  catch { /* ignore quota / privacy mode */ }
+  console.log('[notes-collapse] toggled', { notesCollapsed });
+  applyCollapseButton();
+  // Edit mode replaces the cards with a textarea, so there's nothing to
+  // re-layout right now — the new state takes effect when edit mode exits
+  // and load() re-renders.
+  if (!editing.notes) layoutColumn(notesEl);
 }
 
 function wireInteractions() {
@@ -233,8 +267,14 @@ console.log('[ask] init', { askForm, askInput, askSend, askAppend, askLog });
 function appendTurn(kind, html) {
   const el = document.createElement('div');
   el.className = `ask-turn ${kind}`;
+  const closable = kind === 'q' || kind === 'note';
+  const closeBtn = closable ? '<button type="button" class="ask-close" aria-label="hide">×</button>' : '';
   el.innerHTML = `<div class="who">${kind === 'q' ? 'you' : kind === 'a' ? 'llm' : kind === 'note' ? 'note' : 'error'}</div>` +
-                 `<div class="body">${html}</div>`;
+                 `<div class="body">${html}</div>` +
+                 closeBtn;
+  if (closable) {
+    el.querySelector('.ask-close').addEventListener('click', () => el.remove());
+  }
   askLog.appendChild(el);
   el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   return el;
