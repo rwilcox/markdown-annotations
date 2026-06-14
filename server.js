@@ -302,6 +302,7 @@ app.post('/api/doc/:name/ask', express.json({ limit: '1mb' }), async (req, res) 
   const name = req.params.name;
   const question = (req.body?.question || '').trim();
   const noLlm = !!req.body?.noLlm;
+  const ephemeral = !!req.body?.ephemeral;
   if (!question) return res.status(400).json({ error: 'question is required' });
 
   const docPath = path.join(CONTENT_DIR, name + '.md');
@@ -311,8 +312,20 @@ app.post('/api/doc/:name/ask', express.json({ limit: '1mb' }), async (req, res) 
   try {
     // `noLlm` mode appends the user's text to the document with a placeholder
     // LLM answer of "-" — useful for inserting a note inline without burning
-    // a model call.
+    // a model call. `ephemeral` mode asks the LLM but does NOT write anything
+    // back to the document.
     const answer = noLlm ? '-' : await askLLM({ docSource: docSrc, question });
+
+    if (ephemeral) {
+      return res.json({
+        answer,
+        answerHtml: md.render(answer),
+        answerAnchor: null,
+        noLlm,
+        ephemeral: true,
+      });
+    }
+
     // Append the exchange to the source document so the conversation lives
     // alongside the file itself.
     const sep = docSrc.endsWith('\n') ? '' : '\n';
@@ -332,6 +345,7 @@ app.post('/api/doc/:name/ask', express.json({ limit: '1mb' }), async (req, res) 
       answerHtml: md.render(answer),
       answerAnchor: llmBlock ? llmBlock.anchor : null,
       noLlm,
+      ephemeral: false,
     });
   } catch (err) {
     res.status(500).json({ error: String(err.message || err) });
@@ -374,6 +388,7 @@ app.get('/view/:name', (req, res) => {
   <form id="ask-form">
     <textarea id="ask-input" rows="2" placeholder="Next question…"></textarea>
     <button type="submit" id="ask-send">ask</button>
+    <button type="button" id="ask-private" title="Ask the LLM but do NOT save the exchange to the document">ask (don't save)</button>
     <button type="button" id="ask-append" title="Append this text to the document without calling the LLM">append only</button>
   </form>
 </section>

@@ -259,17 +259,23 @@ function escapeHtml(s) {
 const askForm = document.getElementById('ask-form');
 const askInput = document.getElementById('ask-input');
 const askSend = document.getElementById('ask-send');
+const askPrivate = document.getElementById('ask-private');
 const askAppend = document.getElementById('ask-append');
 const askLog = document.getElementById('ask-log');
 
-console.log('[ask] init', { askForm, askInput, askSend, askAppend, askLog });
+console.log('[ask] init', { askForm, askInput, askSend, askPrivate, askAppend, askLog });
 
 function appendTurn(kind, html) {
   const el = document.createElement('div');
   el.className = `ask-turn ${kind}`;
-  const closable = kind === 'q' || kind === 'note';
+  const closable = kind === 'q' || kind === 'note' || kind === 'a-private';
   const closeBtn = closable ? '<button type="button" class="ask-close" aria-label="hide">×</button>' : '';
-  el.innerHTML = `<div class="who">${kind === 'q' ? 'you' : kind === 'a' ? 'llm' : kind === 'note' ? 'note' : 'error'}</div>` +
+  const who = kind === 'q' ? 'you'
+    : kind === 'a' ? 'llm'
+    : kind === 'a-private' ? 'llm (not saved)'
+    : kind === 'note' ? 'note'
+    : 'error';
+  el.innerHTML = `<div class="who">${who}</div>` +
                  `<div class="body">${html}</div>` +
                  closeBtn;
   if (closable) {
@@ -280,18 +286,20 @@ function appendTurn(kind, html) {
   return el;
 }
 
-async function submitAsk({ noLlm }) {
+const askButtons = [askSend, askPrivate, askAppend].filter(Boolean);
+
+async function submitAsk({ noLlm = false, ephemeral = false } = {}) {
   const question = askInput.value.trim();
-  console.log('[ask] submit', { question, noLlm });
+  console.log('[ask] submit', { question, noLlm, ephemeral });
   if (!question) return;
 
   appendTurn('q', `<p>${escapeHtml(question)}</p>`);
   askInput.value = '';
-  askSend.disabled = true;
-  if (askAppend) askAppend.disabled = true;
+  for (const b of askButtons) b.disabled = true;
   askInput.disabled = true;
-  const pending = appendTurn(noLlm ? 'note' : 'a',
-    noLlm ? '<p><em>appending…</em></p>' : '<p><em>thinking…</em></p>');
+  const pendingKind = noLlm ? 'note' : ephemeral ? 'a-private' : 'a';
+  const pendingMsg = noLlm ? '<p><em>appending…</em></p>' : '<p><em>thinking…</em></p>';
+  const pending = appendTurn(pendingKind, pendingMsg);
 
   try {
     console.log('[ask] POST /api/doc/' + window.DOC_NAME + '/ask');
@@ -300,7 +308,7 @@ async function submitAsk({ noLlm }) {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question, noLlm }),
+        body: JSON.stringify({ question, noLlm, ephemeral }),
       }
     );
     console.log('[ask] response status', res.status);
@@ -312,35 +320,37 @@ async function submitAsk({ noLlm }) {
     } else {
       pending.querySelector('.body').innerHTML = data.answerHtml || `<p>${escapeHtml(data.answer || '')}</p>`;
     }
-    // The server appended the exchange to the source doc — refresh so the
-    // user sees it (and the notes column re-aligns to the new content).
-    await load();
-    // Add a deep-link to the freshly-appended block in the document.
-    if (data.answerAnchor) {
-      const link = document.createElement('a');
-      link.href = '#';
-      link.className = 'jump-link';
-      link.textContent = '↑ open in document';
-      link.addEventListener('click', (ev) => {
-        ev.preventDefault();
-        const target = docEl.querySelector(`[data-anchor="${data.answerAnchor}"]`);
-        if (target) {
-          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          target.classList.add('flash');
-          setTimeout(() => target.classList.remove('flash'), 1500);
-        }
-      });
-      pending.appendChild(link);
+    // Ephemeral answers are not written to the document, so don't reload it.
+    if (!ephemeral) {
+      // The server appended the exchange to the source doc — refresh so the
+      // user sees it (and the notes column re-aligns to the new content).
+      await load();
+      // Add a deep-link to the freshly-appended block in the document.
+      if (data.answerAnchor) {
+        const link = document.createElement('a');
+        link.href = '#';
+        link.className = 'jump-link';
+        link.textContent = '↑ open in document';
+        link.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          const target = docEl.querySelector(`[data-anchor="${data.answerAnchor}"]`);
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.classList.add('flash');
+            setTimeout(() => target.classList.remove('flash'), 1500);
+          }
+        });
+        pending.appendChild(link);
+      }
     }
   } catch (err) {
     console.error('[ask] error', err);
-    pending.classList.remove('a', 'note');
+    pending.classList.remove('a', 'note', 'a-private');
     pending.classList.add('error');
     pending.querySelector('.who').textContent = 'error';
     pending.querySelector('.body').innerHTML = `<p>${escapeHtml(err.message)}</p>`;
   } finally {
-    askSend.disabled = false;
-    if (askAppend) askAppend.disabled = false;
+    for (const b of askButtons) b.disabled = false;
     askInput.disabled = false;
     askInput.focus();
   }
@@ -352,15 +362,20 @@ if (askForm) {
     submitAsk({ noLlm: false });
   });
 
+  if (askPrivate) {
+    askPrivate.addEventListener('click', () => submitAsk({ ephemeral: true }));
+  }
   if (askAppend) {
     askAppend.addEventListener('click', () => submitAsk({ noLlm: true }));
   }
 
-  // Cmd/Ctrl+Enter submits (with LLM); Cmd/Ctrl+Shift+Enter appends only.
+  // Cmd/Ctrl+Enter = ask & save.
+  // Cmd/Ctrl+Shift+Enter = append only (no LLM).
+  // Cmd/Ctrl+Alt+Enter = ask but don't save.
   askInput.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
-      submitAsk({ noLlm: e.shiftKey });
+      submitAsk({ noLlm: e.shiftKey, ephemeral: e.altKey });
     }
   });
 } else {

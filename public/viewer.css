@@ -375,6 +375,7 @@ body.viewer main {
 .ask-close:hover { background: #00000010; color: #000; }
 .ask-turn.q { border-left-color: var(--link); }
 .ask-turn.a { border-left-color: #6aa84f; }
+.ask-turn.a-private { border-left-color: #6aa84f; border-left-style: dashed; background: #f4f9ef; }
 .ask-turn.note { border-left-color: #b58900; background: #fdf6dc; }
 .ask-turn .who {
   font-size: 0.7rem;
@@ -438,6 +439,17 @@ body.viewer main {
 }
 #ask-append:hover:not(:disabled) { background: #eef3fb; }
 #ask-append:disabled { opacity: 0.6; cursor: wait; }
+#ask-private {
+  font-size: 0.9rem;
+  padding: 0.45rem 0.9rem;
+  background: #fff;
+  color: #6aa84f;
+  border: 1px dashed #6aa84f;
+  border-radius: 4px;
+  cursor: pointer;
+}
+#ask-private:hover:not(:disabled) { background: #f4f9ef; }
+#ask-private:disabled { opacity: 0.6; cursor: wait; }
 
 article table {
     border-collapse: collapse;
