@@ -6,7 +6,7 @@
 import { spawn } from 'node:child_process';
 
 const LLM_BIN = '/opt/local/Library/Frameworks/Python.framework/Versions/3.10/bin/llm';
-const LLM_MODEL = 'gemini/gemini-3-pro-preview';
+const LLM_MODEL = 'gemini/gemini-flash-latest';
 const SYSTEM_PROMPT =
   'this is a conversation between an llm and a user. ' +
   'Please answer the question at the end given the context of the file';
